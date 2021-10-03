@@ -1,5 +1,25 @@
+
+resource "aws_cognito_user_pool" "private_pool" {
+  name = "Private_Pool"
+}
+
+data "aws_cognito_user_pools" "private_pool" {
+  depends_on = [
+    aws_cognito_user_pool.private_pool
+  ]
+  name = "Private_Pool"
+}
+
 resource "aws_api_gateway_rest_api" "rest_api" {
   name = "Terraform Managed REST API"
+}
+
+resource "aws_api_gateway_authorizer" "private_resource" {
+  name          = "CognitoPrivateUserPoolAuthorizer"
+  rest_api_id   = aws_api_gateway_rest_api.rest_api.id
+
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = data.aws_cognito_user_pools.private_pool.arns
 }
 
 # resource "aws_api_gateway_resource" "root_resource" {
@@ -88,18 +108,22 @@ module "public_resources" {
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "GET"
+      api_key_required = false
     },
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "PUT"
+      api_key_required = true
     },
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "POST"
+      api_key_required = true
     },
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "DELETE"
+      api_key_required = true
     }
   ]
 }
@@ -109,7 +133,6 @@ module "private_resource" {
   parent_id = aws_api_gateway_rest_api.rest_api.root_resource_id
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   path_part = "private"
-  handlers = []
 }
 
 module "private_dynamic_resource" {
@@ -117,14 +140,20 @@ module "private_dynamic_resource" {
   parent_id = module.private_resource.value.id
   rest_api_id = aws_api_gateway_rest_api.rest_api.id
   path_part = "{path+}"
-  handlers = [
+  auth_handlers = [
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "GET"
+      api_key_required = true
+      authorization = "COGNITO_USER_POOLS"
+      authorizer_id = aws_api_gateway_authorizer.private_resource.id
     },
     {
       lambda_invoke_arn = local.public_resources_handler
       method = "POST"
+      api_key_required = true
+      authorization = "COGNITO_USER_POOLS"
+      authorizer_id = aws_api_gateway_authorizer.private_resource.id
     }
   ]
 }

@@ -14,9 +14,23 @@ variable "path_part" {
 }
 
 variable "handlers" {
-    type = list(object({
-        method = string
-        lambda_invoke_arn = string
-    }))
-    description = "List of method need to add to given resource"
+  default = []
+  type = list(object({
+    method = string
+    lambda_invoke_arn = string
+    api_key_required = bool
+  }))
+  description = "List of method need to add to given resource"
+}
+
+variable "auth_handlers" {
+  default = []
+  type = list(object({
+    method = string
+    lambda_invoke_arn = string
+    api_key_required = bool
+    authorization = string
+    authorizer_id = string
+  }))
+  description = "List of method need to add to given resource with authorization support"
 }
