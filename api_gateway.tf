@@ -1,6 +1,6 @@
-# resource "aws_api_gateway_rest_api" "demo-gateway" {
-#   name = "demo-gateway"
-# }
+resource "aws_api_gateway_rest_api" "rest_api" {
+  name = "Terraform Managed REST API"
+}
 
 # resource "aws_api_gateway_resource" "root_resource" {
 #     path_part = "public"
@@ -59,13 +59,13 @@
 #   rest_api_id = aws_api_gateway_rest_api.demo-gateway.id
 # }
 
-module "api_gateway" {
-  source          = "./modules/gateway"
-  api_gateway_name = "Terraform Manged API Gateway"
-  resource_path = "public"
-  lamda_invoke_arn = aws_lambda_function.lamda_function.invoke_arn
-  stage_name = "Prod"
-}
+# module "api_gateway" {
+#   source          = "./modules/gateway"
+#   api_gateway_name = "Terraform Manged API Gateway"
+#   resource_path = "public"
+#   lamda_invoke_arn = aws_lambda_function.lamda_function.invoke_arn
+#   stage_name = "Prod"
+# }
 
 # module "api_gateway_new" {
 #   source          = "./modules/gateway"
@@ -75,3 +75,56 @@ module "api_gateway" {
 #   stage_name = "Prod"
 # }
 
+
+locals {
+  public_resources_handler = aws_lambda_function.lamda_function.invoke_arn
+}
+module "public_resources" {
+  source = "./modules/aws_api_gateway_resource"
+  parent_id = aws_api_gateway_rest_api.rest_api.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  path_part = "public"
+  handlers = [
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "GET"
+    },
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "PUT"
+    },
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "POST"
+    },
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "DELETE"
+    }
+  ]
+}
+
+module "private_resource" {
+  source = "./modules/aws_api_gateway_resource"
+  parent_id = aws_api_gateway_rest_api.rest_api.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  path_part = "private"
+  handlers = []
+}
+
+module "private_dynamic_resource" {
+  source = "./modules/aws_api_gateway_resource"
+  parent_id = module.private_resource.value.id
+  rest_api_id = aws_api_gateway_rest_api.rest_api.id
+  path_part = "{path+}"
+  handlers = [
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "GET"
+    },
+    {
+      lambda_invoke_arn = local.public_resources_handler
+      method = "POST"
+    }
+  ]
+}
